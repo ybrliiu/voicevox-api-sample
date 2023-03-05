@@ -1,46 +1,59 @@
-import React, { ChangeEvent, useState } from 'react'
-import superagent from 'superagent'
-import './App.css'
+import React, { ChangeEvent, createContext, useContext, useState } from 'react';
+import superagent from 'superagent';
+import './App.css';
 
-// Query型定義
-type Mora = {
-  text: string
-  consonant: string
-  consonant_length: number
-  vowel: string
-  vowel_length: number
-  pitch: number
-}
+const MessagesContext = createContext<Message[]>([]);
 
-type Query = {
-  accent_phrases: {
-      moras: Mora[]
-      accent: number
-      pause_mora: Mora
-  }
-  speedScale: number
-  pitchScale: number
-  intonationScale: number
-  volumeScale: number
-  prePhonemeLength: number
-  postPhonemeLength: number
-  outputSamplingRate: number
-  outputStereo: boolean
-  kana: string
+type Message = {
+  role: 'bot' | 'user',
+  content: string,
 };
+
+function Messages() {
+  const messagesStyle = {
+    height: '500px',
+    width: '500px',
+  };
+  const messages = useContext(MessagesContext);
+
+  return (
+    <div style={ messagesStyle }>
+      { messages.map((message, i) => {
+          return message.role === 'user'
+            ? <div key={i}>あなた: { message.content }</div>
+            : <div key={i}>春日部つむぎ: { message.content }</div>
+      }) }
+    </div>
+  );
+}
 
 const App = () => {
   const [inputText, setInputText] = useState<string>('');
+  const messages = useContext(MessagesContext);
 
-  const createQuery = async () => {
+  const sendText = async () => {
+
+    if (!inputText) {
+      return;
+    }
+
+    messages.push({
+      role: 'user',
+      content: inputText,
+    });
+    setInputText('');
 
     const res = await superagent
       .post('http://localhost:5000/')
       .query({ text: inputText })
       .responseType('blob');
+    
+    console.log(res.headers);
+    console.log(res.header);
+    console.log(res);
+    
     const blob = res.body as Blob;
-
-    const audiocontext = new AudioContext;
+    const audiocontext = new AudioContext();
     const audioBuffer = await audiocontext.decodeAudioData(await blob.arrayBuffer());
     const source = audiocontext.createBufferSource();
     source.buffer = audioBuffer;
@@ -51,14 +64,17 @@ const App = () => {
   return (
     <div>
       <div>
-        <h2>読み上げたい文章を入力</h2>
+        <h2>春日部つむぎとおしゃべり</h2>
+        <MessagesContext.Provider value={messages}>
+          <Messages />
+        </MessagesContext.Provider>
         <textarea 
           value={inputText}
           onChange={
             (e: ChangeEvent<HTMLTextAreaElement>) => setInputText(e.target.value)
           }
         />
-        { inputText ? (<button onClick={createQuery}>生成</button>) : null }
+        <button onClick={sendText}>送信</button>
       </div>
     </div>
   )
