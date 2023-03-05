@@ -33,15 +33,10 @@ const App = () => {
   const [inputText, setInputText] = useState<string>('');
 
   const createQuery = async () => {
-    const queryResponse = await superagent
-      .post('http://localhost:50021/audio_query')
-      .query({ speaker: 8, text: inputText });
-    const query = queryResponse.body as Query;
 
     const res = await superagent
-      .post('http://localhost:50021/synthesis')
-      .query({ speaker: 8 })
-      .send(query)
+      .post('http://localhost:5000/')
+      .query({ text: inputText })
       .responseType('blob');
     const blob = res.body as Blob;
 
