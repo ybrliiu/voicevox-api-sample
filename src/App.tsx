@@ -1,24 +1,23 @@
-import React, { ChangeEvent, createContext, useContext, useState } from 'react';
+import React, { ChangeEvent, createContext, useContext, useReducer, useState } from 'react';
 import superagent from 'superagent';
 import './App.css';
-
-const MessagesContext = createContext<Message[]>([]);
 
 type Message = {
   role: 'bot' | 'user',
   content: string,
 };
 
+const MessagesContext = createContext<Message[]>([]);
+
 function Messages() {
   const messagesStyle = {
     height: '500px',
     width: '500px',
   };
-  const messages = useContext(MessagesContext);
 
   return (
     <div style={ messagesStyle }>
-      { messages.map((message, i) => {
+      { useContext(MessagesContext).map((message, i) => {
           return message.role === 'user'
             ? <div key={i}>あなた: { message.content }</div>
             : <div key={i}>春日部つむぎ: { message.content }</div>
@@ -29,7 +28,9 @@ function Messages() {
 
 const App = () => {
   const [inputText, setInputText] = useState<string>('');
-  const messages = useContext(MessagesContext);
+  const [messages, pushMessages] = useReducer(function (prevMessages: Message[], newMessage: Message): Message[] {
+    return [ ...prevMessages, newMessage ];
+  }, []);
 
   const sendText = async () => {
 
@@ -37,22 +38,33 @@ const App = () => {
       return;
     }
 
-    messages.push({
+    pushMessages({
       role: 'user',
       content: inputText,
     });
     setInputText('');
 
-    const res = await superagent
-      .post('http://localhost:5000/')
-      .query({ text: inputText })
-      .responseType('blob');
+    const responseText = await (async () => {
+      const res = await superagent
+        .post('http://localhost:5000/talk')
+        .query({ text: inputText });
+      console.log(res);
+      return res.text;
+    })();
     
-    console.log(res.headers);
-    console.log(res.header);
-    console.log(res);
-    
-    const blob = res.body as Blob;
+    const blob = await (async () => {
+      const res = await superagent
+        .post('http://localhost:5000/generate-voice')
+        .query({ serif: responseText })
+        .responseType('blob');
+      return res.body;
+    })() as Blob;
+ 
+    pushMessages({
+      role: 'bot',
+      content: responseText,
+    });
+
     const audiocontext = new AudioContext();
     const audioBuffer = await audiocontext.decodeAudioData(await blob.arrayBuffer());
     const source = audiocontext.createBufferSource();
